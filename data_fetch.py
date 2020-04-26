@@ -1,6 +1,8 @@
 import requests
 import re
 from bs4 import BeautifulSoup
+import os
+import xml.etree.ElementTree as ET
 
 # Follow all a-tag links from given base, forming a web
 # Returns list of sub-urls for base-url
@@ -73,5 +75,40 @@ def get_price(identifier, url):
 
     return item_prices
 
+def alexa_info(url):
+    info = {}
+    try:
+        api_key = os.environ['API_KEY']
+    except:
+        print("Please set your aws alexa api key")
 
+    base_url = "https://awis.api.alexa.com/api"
+    headers = {"x-api-key": api_key}
+    params = {
+        "Action": "UrlInfo",
+        "ResponseGroup": "Rank,SiteData,UsageStats",
+        "Url": url
+    }
 
+    r = requests.get(url=base_url, params=params, headers=headers)
+
+    root = ET.fromstring(r.text)
+
+    info['name'] = root.find("./Results/Result/Alexa/ContentData/SiteData/Title").text
+    # info['date_created']
+    # info['description']
+    info['url'] = root.find("./Results/Result/Alexa/ContentData/DataUrl").text
+
+    info['time_range'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/TimeRange/Months").text
+
+    # Alexa rank
+    info['alexa_rank'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Rank/Value").text
+    info['alexa_rank_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Rank/Delta").text
+
+    # Reach
+    # info['reach_rank'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/Rank/Value").text
+    # info['reach_rank_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/Rank/Delta").text
+    info['reach_permil'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/PerMillion/Value").text
+    info['reach_permil_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/PerMillion/Delta").text
+
+    print(info)
