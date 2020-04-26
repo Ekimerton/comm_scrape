@@ -1,5 +1,5 @@
-from data_fetch import alexa_info
+from data_fetch import get_name
 import json
 
-alexa_info("https://googansquad.com/")
+print(get_name("https://googansquad.com/"))
 

@@ -3,6 +3,7 @@ import re
 from bs4 import BeautifulSoup
 import os
 import xml.etree.ElementTree as ET
+from decimal import *
 
 # Follow all a-tag links from given base, forming a web
 # Returns list of sub-urls for base-url
@@ -62,18 +63,31 @@ def get_urls(base):
     return master_list
 
 def get_price(identifier, url):
-    item_prices = []
-
+    sub = re.sub
     source = requests.get(url)
     soup = BeautifulSoup(source.text, 'html.parser')
     prices = soup.find_all(re.compile(r'.'), class_=identifier)
-    for price in prices:
-        item_prices.append(price.text)
 
-    if not item_prices:
+    cost_sum = Decimal(0)
+    for price in prices:
+        price_val = Decimal(sub(r'[^\d.]', '', price.text))
+        cost_sum += price_val
+
+    if prices:
+        return cost_sum / len(prices)
+    else:
         return None
 
-    return item_prices
+def get_name(url):
+    r = requests.get(url=url)
+    soup = BeautifulSoup(r.text, 'html.parser')
+    web_title = soup.title.string
+    meta_title = soup.find("meta", property="og:title")
+    if meta_title:
+        return meta_title['content']
+    else:
+        return web_title
+
 
 def alexa_info(url):
     info = {}
@@ -86,18 +100,20 @@ def alexa_info(url):
     headers = {"x-api-key": api_key}
     params = {
         "Action": "UrlInfo",
-        "ResponseGroup": "Rank,SiteData,UsageStats",
+        "ResponseGroup": "Rank,SiteData,UsageStats,Categories,RankByCountry",
         "Url": url
     }
 
     r = requests.get(url=base_url, params=params, headers=headers)
 
     root = ET.fromstring(r.text)
+    print(r.text)
 
-    info['name'] = root.find("./Results/Result/Alexa/ContentData/SiteData/Title").text
+    # Basic Info
     # info['date_created']
     # info['description']
     info['url'] = root.find("./Results/Result/Alexa/ContentData/DataUrl").text
+    info['country'] = root.find("./Results/Result/Alexa/TrafficData/RankByCountry/Country").attrib['Code']
 
     info['time_range'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/TimeRange/Months").text
 
@@ -106,9 +122,9 @@ def alexa_info(url):
     info['alexa_rank_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Rank/Delta").text
 
     # Reach
-    # info['reach_rank'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/Rank/Value").text
-    # info['reach_rank_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/Rank/Delta").text
     info['reach_permil'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/PerMillion/Value").text
     info['reach_permil_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/PerMillion/Delta").text
 
-    print(info)
+    # Categories
+
+    return info
