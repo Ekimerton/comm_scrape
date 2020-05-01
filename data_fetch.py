@@ -1,4 +1,5 @@
 import requests
+import csv
 import re
 from bs4 import BeautifulSoup
 import os
@@ -13,8 +14,6 @@ def get_urls(base):
     parse_stack = ['/']
 
     while len(parse_stack) > 0:
-        if len (parse_stack) > 1000:
-            return ["Too many links, disable block to parse"]
         print("Left to parse:", len(parse_stack))
         try:
             url_end = parse_stack.pop()
@@ -56,27 +55,51 @@ def get_urls(base):
                 parse_stack.append(href)
             master_list.append(url_end)
         except Exception as e:
-            print('error')
-            print(e)
+            pass
 
     master_list.sort()
     return master_list
 
+def average_price(file_name):
+    with open("./" + file_name + '/products.csv', newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        total = Decimal(0)
+        skip = True # Skip Headers
+        item_count = 0
+        for row in reader:
+            if skip:
+                skip = False
+                continue
+
+            total += Decimal(row[2])
+            item_count += 1
+
+        return total / item_count
+
 def get_price(identifier, url):
-    sub = re.sub
-    source = requests.get(url)
-    soup = BeautifulSoup(source.text, 'html.parser')
-    prices = soup.find_all(re.compile(r'.'), class_=identifier)
+    try:
+        sub = re.sub
+        source = requests.get(url)
+        soup = BeautifulSoup(source.text, 'html.parser')
+        prices = soup.find_all(re.compile(r'.'), class_=identifier)
 
-    cost_sum = Decimal(0)
-    for price in prices:
-        price_val = Decimal(sub(r'[^\d.]', '', price.text))
-        cost_sum += price_val
+        if len(prices) > 1:
+            return None
 
-    if prices:
-        return cost_sum / len(prices)
-    else:
-        return None
+        cost_sum = Decimal(0)
+        for price in prices:
+            try:
+                price_val = Decimal(sub(r'[^\d.]', '', price.text))
+                cost_sum += price_val
+            except:
+                pass
+
+        if prices:
+            return float(cost_sum / len(prices))
+        else:
+            return None
+    except Exception as e:
+        print(e)
 
 def get_name(url):
     r = requests.get(url=url)
@@ -110,21 +133,47 @@ def alexa_info(url):
     print(r.text)
 
     # Basic Info
-    # info['date_created']
-    # info['description']
-    info['url'] = root.find("./Results/Result/Alexa/ContentData/DataUrl").text
-    info['country'] = root.find("./Results/Result/Alexa/TrafficData/RankByCountry/Country").attrib['Code']
+    try:
+        info['date_created'] = root.find("").text
+    except:
+        info['date_created'] = None
 
-    info['time_range'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/TimeRange/Months").text
+    try:
+        info['country'] = root.find("./Results/Result/Alexa/TrafficData/RankByCountry/Country").attrib['Code']
+    except:
+        info['country'] = None
 
-    # Alexa rank
-    info['alexa_rank'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Rank/Value").text
-    info['alexa_rank_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Rank/Delta").text
+    try:
+        info['keywords'] = root.find("./Results/Result/Alexa/TrafficData/").text
+    except:
+        info['keywords'] = None
+
+    # Time Range for Metrics
+    try:
+        info['time_range'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/TimeRange/Months").text
+    except:
+        info['time_range'] = None
+
+    # Alexa Rank
+    try:
+        info['alexa_rank'] = int(root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Rank/Value").text)
+    except:
+        info['alexa_rank'] = None
+
+    try:
+        info['alexa_rank_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Rank/Delta").text
+    except:
+        info['alexa_rank_delta'] = None
 
     # Reach
-    info['reach_permil'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/PerMillion/Value").text
-    info['reach_permil_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/PerMillion/Delta").text
+    try:
+        info['reach_permil'] = float(root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/PerMillion/Value").text)
+    except:
+        info['react_permil'] = None
 
-    # Categories
+    try:
+        info['reach_permil_delta'] = root.find("./Results/Result/Alexa/TrafficData/UsageStatistics/UsageStatistic/Reach/PerMillion/Delta").text or None
+    except:
+        info['reach_permil_delta'] = None
 
     return info
